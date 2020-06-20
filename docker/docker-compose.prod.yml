@@ -1,0 +1,92 @@
+version: '3.7'
+
+services:
+  redis:
+    image: redis:alpine
+    container_name: onespring-redis
+    hostname: redis
+    networks:
+      - onespring-network
+    command: ["redis-server", "--save ''"]
+
+  backend:
+    build: ..
+    container_name: onespring-backend
+    hostname: onespring-backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://onespring-db:3306/onespring
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: password
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_RABBITMQ_HOST: onespring-rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ehsan
+      SPRING_RABBITMQ_PASSWORD: admin123
+      SPRING_RABBITMQ_LISTENER_SIMPLE_CONCURRENCY: 4
+      SPRING_RABBITMQ_LISTENER_SIMPLE_MAX-CONCURRENCY: 4
+      WAIT_HOST: onespring-db:3306
+    restart: always
+    depends_on:
+      - db
+      - redis
+      - rabbitmq
+    networks:
+      - onespring-network
+
+  db:
+    image: mysql:5.7
+    restart: always
+    container_name: onespring-db
+    hostname: onespring-db
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: onespring
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: password
+    volumes:
+      - db:/var/lib/mysql
+    networks:
+      - onespring-network
+
+  onespring-nginx-proxy:
+    image: nginx:alpine
+    container_name: onespring-nginx-proxy
+    hostname: onespring-nginx-proxy
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "80:8080"
+    depends_on:
+      - backend
+    networks:
+      - onespring-network
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/nginx.conf
+
+  rabbitmq:
+    image: rabbitmq:3.8-management-alpine
+    container_name: onespring-rabbitmq
+    hostname: onespring-rabbitmq
+    environment:
+      - HOSTNAME=onespring-rabbitmq
+      - RABBITMQ_DEFAULT_USER=ehsan
+      - RABBITMQ_DEFAULT_PASS=admin123
+      - RABBITMQ_LOGS=rabbit.log
+    healthcheck:
+      test: [ "CMD", "nc", "-z", "localhost", "5672" ]
+      interval: 5s
+      timeout: 15s
+      retries: 1
+    networks:
+      - onespring-network
+
+volumes:
+  db:
+
+networks:
+  onespring-network:
+    external:
+      name: onespring-network

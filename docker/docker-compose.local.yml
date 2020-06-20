@@ -1,0 +1,53 @@
+version: '3.7'
+
+services:
+  redis:
+    image: redis:alpine
+    hostname: redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--save ''"]
+
+  backend:
+    build: ..
+    ports:
+      - "8080:8080"
+    restart: always
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/onespring
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: password
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      WAIT_HOST: db:3306
+    depends_on:
+      - redis
+      - db
+
+  db:
+    image: mysql:5.7
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: onespring
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: password
+    volumes:
+      - db:/var/lib/mysql
+
+  rabbitmq:
+    image: rabbitmq:3.8-management-alpine
+    environment:
+      - HOSTNAME=rabbitmq
+      - RABBITMQ_DEFAULT_USER=ehsan
+      - RABBITMQ_DEFAULT_PASS=admin123
+      - RABBITMQ_LOGS=rabbit.log
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+volumes:
+  db:
+
